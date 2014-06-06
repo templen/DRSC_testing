@@ -19,11 +19,11 @@ def DRSC_URL(more = ''):
 
 class DIOPTTest(unittest.TestCase):
 
-    def setUp(self): #2
+    def setUp(self):
         self.browser = webdriver.Firefox()
         self.browser.implicitly_wait(3)
 
-    def tearDown(self): #3
+    def tearDown(self):
         self.browser.quit()
 
     def test_does_the_title_match_the_page_title(self):
