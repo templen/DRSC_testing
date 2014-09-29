@@ -4,6 +4,7 @@ from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait # available since 2.4.0
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 import unittest
 import sys, random
 
@@ -18,13 +19,34 @@ def DRSC_URL(more = ''):
         return "http://www.flyrnai.org" + more
 
 
-
-
-class DIOPTTest(unittest.TestCase):
+class GeneralTest(unittest.TestCase):
 
     def setUp(self):
         self.browser = webdriver.Firefox()
         self.browser.implicitly_wait(3)
+        self.titles = {
+            "DIOPT": "DRSC Integrative Ortholog Prediction Tool",
+            "cellexpress":      "Gene Expression Levels by Cell Line",
+            "TRiP":     "The Transgenic RNAi Resource Project",
+            "DIOPTM":   "DRSC Integrative Ortholog Prediction Tool",
+            "screensummary":    "Public DRSC Screens",
+            "genelookup":       "Gene/Reagent Lookup",
+            "DIOPT-DIST":       "Disease Gene Query",
+            "TRiPstocks":       "Batch TRiP Stock Lookup",
+            "snapdragon":       "SnapDragon - dsRNA Design",
+            "heatmap":  "Heatmapped Data Display",
+            "UP-TORR":  "UP-TORR",
+            "HuDis":    "HuDis-TRiP",
+            "minotar":  "MinoTar: MicroRNA ORF Target Predictions",
+            "signedppi":        "SignedPPI",
+            "FlyPrimerBank":    "DRSC FlyPrimerBank",
+            "login":    "Member Login Page",
+            "RNAi-rescue":      "Genes for RNAi Rescue",
+            "HRMA":     "HRM",
+            "TALEs":    "TALE Request",
+            "RSVP":     "RNAi Stock Validation",
+            # THIS LIST IS FAR FROM COMPLETE
+            }
 
     def tearDown(self):
         self.browser.quit()
@@ -33,9 +55,83 @@ class DIOPTTest(unittest.TestCase):
         # standard question - is the page title correct for this page
         # (or did we forget to update it when we copied the code for
         # this page from somewhere else?)
-        self.browser.get(DRSC_URL("DIOPT"))
+        for page in (self.titles):
+            self.browser.get(DRSC_URL(page))
+            self.assertIn(self.title[page], self.browser.title)
+            ## Perhaps a better test would be to crawl every link and
+            ## assert that none of the pages have the same title?
+
+
+class DIOPTTest(unittest.TestCase):
+
+    def setUp(self):
+        self.browser = webdriver.Firefox()
+        self.browser.implicitly_wait(3)
+        self.geneList = "nc\nng1\nng2\nwg\nDRSC05220\nDRSC06738\nDRSC27862\n" +\
+            "JF02254\nDRSC07353\nDRSC27666\n\n\nCASP9\ncytochrome c\n" +\
+            "APAF-1\nCASP8\nCASP6\nCASP2\nCASP3\n\nCG3038\nG9a\nCG13377\n" +\
+            "cin\newg"
+
+    def tearDown(self):
+        self.browser.quit()
+
+    def assertDIOPT():
         self.assertIn("DRSC Integrative Ortholog Prediction Tool",
-                      self.browser.title)
+                      self.browser.title,
+                      "Should be on the DIOPT page but instead the title " +
+                      'reads "%s".' % self.browser.title)
+
+    def test_links_to_DIOPT(self):
+        # confirm that we can get to DIOPT from home page, tools page, and menu
+        # this one should really be generalized for all pages
+
+        # from link on home page
+        self.browser.get(DRSC_URL(""))
+        self.browser.find_element_by_link_text("DIOPT").send_keys(Keys.ENTER)
+        self.assertDIOPT()
+
+        # from the tools page
+        self.browser.get(DRSC_URL("DRSC-TOO.html"))
+        self.browser.find_element_by_link_text("DIOPT").send_keys(Keys.ENTER)
+        self.assertDIOPT()
+
+        # from the menu bar
+        self.browser.get(DRSC_URL("DRSC-PRR.html"))
+        # hover over tools menu
+        ActionChains(self.browser).move_to_element(onToolTop[0]).perform()
+        # get the tools submenu element
+        menuDiv = self.browser.find_element_by_css_selector(
+            "div#menuDivTools.menuDiv")
+        # click the DIOPT link in the submenu
+        menuDiv.find_element_by_link_text("DIOPT").send_keys(Keys.ENTER)
+        self.assertDIOPT()
+
+    def start_search_by_gene(self):
+        # Alice goes to the DIOPT query page
+        self.browser.get(DRSC_URL("DIOPT"))
+
+        # She looks up her genes (and settings) of interest
+        inputElement = self.browser.find_element_by_name("gene_list")
+        inputElement.send_keys("\n".join(self.geneList))
+        if self.vectorList:
+            checkboxes = self.browser.find_elements_by_name("vector_cb_grp")
+            for cbx in checkboxes:
+                val = cbx.get_attribute("value")
+                if val in self.vectorList:
+                    cbx.click()
+        if self.prodStatusList:
+            checkboxes = self.browser.find_elements_by_name(
+                "prod_status_cb_grp")
+            for cbx in checkboxes:
+                label = cbx.find_element(By.XPATH, "..") # label is parent
+                                                         # of cbx
+                val = label.text
+                if val in self.vectorList:
+                    self.set_checkbox(cbx)
+                else:
+                    self.unset_checkbox(cbx)
+        self.browser.find_element_by_name("submit").click()
+        self.wait_for_TRiP_DB_Query_results_page()
 
     def test_are_the_weighted_scores_close_to_the_scores(self):
         # test because Treefam got left out of weighted score,
